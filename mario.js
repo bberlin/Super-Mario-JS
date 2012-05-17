@@ -13,6 +13,7 @@ $(function(){
 		shiftDown:false,
 		mario : {},
 		objects : [],
+		floors : [],
 		objectLevel : document.getElementById("level").getContext("2d"),
 		marioLevel : document.getElementById("mario").getContext("2d"),
 		collisions : [false,false,false,false], //top,right,bottom,left
@@ -43,7 +44,11 @@ $(function(){
 			  }
 		  }
 		  
-		  setTimeout(function(){z.update();}, 1000/60);
+		  if(z.mario.currentDY  > 224){
+			  z.mario.die();
+		  } else {
+		  		setTimeout(function(){z.update();}, 1000/60);
+		  }
 		},
 		
 		checkCollisions : function(){
@@ -62,7 +67,15 @@ $(function(){
 					if(mleft > cur.currentDX && mleft < cur.currentDX + cur.currentDWidth && mtop < cur.currentDY + cur.currentDHeight && mbottom-2 > cur.currentDY){ z.collisions[3] = true;}
 				}
 			}
-			return false;
+			mright = z.mario.bkgdPos + z.mario.currentDWidth;
+			mleft = z.mario.bkgdPos;
+			for(var k=0; k < z.floors.length; k++){
+				var cur = z.floors[k];
+				if(mright > cur.x && mright < cur.x + cur.w && mtop < cur.y + cur.h && mbottom-2 > cur.y){ z.collisions[1] = true;}
+				if(mbottom > cur.y && mbottom < cur.y + cur.h && mleft+2 < cur.x + cur.w && mright-2 > cur.x ){z.collisions[2] = true;}
+				if(mleft > cur.x && mleft < cur.x + cur.w && mtop < cur.y + cur.h && mbottom-2 > cur.y){ z.collisions[3] = true;}
+			}
+			
 		},
 		
 		moveWorldLeft : function(){
@@ -98,6 +111,13 @@ $(function(){
 					z.objects.push(x);
 				});
 			});
+			
+			//var d = new floorObject(0,200, 1104,24);
+			z.floors.push(new floorObject(0,200, 1104,24));
+			z.floors.push(new floorObject(1136,200,240,24));
+			z.floors.push(new floorObject(1424,200,1024,24));
+			z.floors.push(new floorObject(2480,200,904,24));
+			console.log(z.floors);
 			
 			$('body').keydown(function(e){
 				var key = e.which;
@@ -159,6 +179,7 @@ $(function(){
 		currentDY : 172,
 		currentDWidth : 18,
 		currentDHeight : 30,
+		bkgdPos : 0,
 		
 		direction:0, //is facing left or right
 		currentHeight: 0, //tracks jump height
@@ -171,21 +192,23 @@ $(function(){
 		YVELOCITY : 2,
 		
 		moveRight : function(){
-			var z = this,
-			collided = level.collisions[1];
+			var z = this;
 			
 			if(z.direction == z.LEFT && !z.isJumping){
 				z.direction = z.RIGHT;
 				z.currentSX = z.TURN; 
 				z.currentSY = z.RIGHT;
 			} else{
-				if(z.currentDX < z.MAXRIGHT && !collided){
+				if(z.currentDX < z.MAXRIGHT && !level.collisions[1]){
 					z.currentDX += z.XVELOCITY;	
-				} else if(!collided){
+					z.bkgdPos += z.XVELOCITY;
+				} else if(!level.collisions[1]){
 					level.moveWorldRight();
+					z.bkgdPos += z.XVELOCITY;
 				}
 				
-				if(z.currentDY != 172 && !level.collisions[2]){
+				
+				if(!level.collisions[2]){
 					z.currentSX = z.JUMP;
 					z.currentDY += z.YVELOCITY;
 					z.currentHeight -= z.YVELOCITY;
@@ -212,12 +235,15 @@ $(function(){
 				z.currentSX = z.TURN; 
 				z.currentSY = z.LEFT;
 			} else { 
-				if(z.currentDX <= 35 && parseInt($("#level").css("background-position")) < 0 && !collided){ 
+				if(z.currentDX <= 35 && parseInt($("#level").css("background-position")) < 0 && !level.collisions[3]){ 
 					level.moveWorldLeft();
-				} else if(z.currentDX > 0 && !collided) {
+					z.bkgdPos -= z.XVELOCITY;
+				} else if(z.currentDX > 0 && !level.collisions[3]) {
 					z.currentDX -= z.XVELOCITY;
+					z.bkgdPos -= z.XVELOCITY;
 				} 
-				if(z.currentDY != 172 && !level.collisions[2]){
+				
+				if(!level.collisions[2]){
 					z.currentSX = z.JUMP;
 					z.currentDY += z.YVELOCITY;
 					z.currentHeight -= z.YVELOCITY;
@@ -249,7 +275,7 @@ $(function(){
 					z.jumpDirection = "DOWN";	
 				}
 			} else {
-				if(z.currentDY != 172 && !level.collisions[2]){
+				if( !level.collisions[2]){
 					z.currentDY += z.YVELOCITY;
 					z.currentHeight -= z.YVELOCITY;
 					z.jumpDirection = "DOWN";
@@ -262,22 +288,28 @@ $(function(){
 			if(level.rightDown && !level.collisions[1]){ 
 				if(z.currentDX < z.MAXRIGHT){
 					z.currentDX += z.XVELOCITY;
+					z.bkgdPos += z.XVELOCITY;
 				}else{
 					level.moveWorldRight();
+					z.bkgdPos += z.XVELOCITY;
 				}
+				
 			}else if(level.leftDown && !level.collisions[3]){ 
 				if(z.currentDX <= 35 &&   parseInt($("#level").css("background-position")) < 0){
 					level.moveWorldLeft();
+					z.bkgdPos -= z.XVELOCITY;
 				}else if(z.currentDX > 0){
 					z.currentDX -= z.XVELOCITY;	
+					z.bkgdPos -= z.XVELOCITY;
 				}
+				
 			}
 			
 		},
 		stand : function(){
 			var z = this;
 			
-			if(z.currentDY != 172 && !level.collisions[2]){
+			if(!level.collisions[2]){
 				z.currentDY += z.YVELOCITY;
 				z.currentHeight -= z.YVELOCITY;
 				z.jumpDirection = "DOWN";
@@ -323,6 +355,12 @@ $(function(){
 		draw : function(){
 			var z = this;
 			level.marioLevel.drawImage(z.currentImage, z.currentSX, z.currentSY, z.currentSWidth, z.currentSHeight, z.currentDX, z.currentDY, z.currentDWidth, z.currentDHeight);	
+		},
+		
+		die : function(){
+			var z = this;
+			
+			window.location.reload();	
 		}
 	}
 	
@@ -345,6 +383,14 @@ $(function(){
 			var z = this;
 			level.objectLevel.drawImage(z.currentImage, z.currentSX, z.currentSY, z.currentSWidth, z.currentSHeight, z.currentDX, z.currentDY, z.currentDWidth, z.currentDHeight);
 		}
+	}
+	
+	function floorObject(x, y, w, h){
+		var z = this;
+		z.x = x,
+		z.y = y,
+		z.w = w,
+		z.h = h;
 	}
 	
 	level.init();
