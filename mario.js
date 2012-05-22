@@ -13,9 +13,12 @@ $(function(){
 		shiftDown:false,
 		mario : {},
 		objects : [],
+		activeObjects : [],
+		items : [],
 		floors : [],
 		objectLevel : document.getElementById("level").getContext("2d"),
 		marioLevel : document.getElementById("mario").getContext("2d"),
+		itemLevel : document.getElementById("items").getContext("2d"),
 		collisions : [false,false,false,false], //top,right,bottom,left
 		
 		update : function(){
@@ -36,7 +39,20 @@ $(function(){
 		 
 		  for(var k = 0; k < z.objects.length; k++){
 			  var cur = z.objects[k];
-			  if(cur.currentDX > (0 - cur.currentSWidth) && cur.currentDX <= 225 + cur.currentSWidth){
+			  if(!cur.destroyed && cur.currentDX > (0 - cur.currentSWidth) && cur.currentDX <= 225 + cur.currentSWidth){
+				  cur.update();
+				  cur.draw();
+			      cur.active = true;
+				  z.activeObjects.push(cur);
+			  } else if(cur.active){
+					cur.active = false;
+					z.activeObjects.splice(z.objects.indexOf(cur),1);  
+			  }
+		  }
+		  for(var l = 0; l < z.items.length; l++){
+			  var cur = z.items[l];
+			  if(!cur.destroyed && cur.currentDX > (0 - cur.currentSWidth) && cur.currentDX <= 225 + cur.currentSWidth){
+				  cur.update();
 				  cur.draw();
 			      cur.active = true;
 			  } else if(cur.active){
@@ -57,16 +73,26 @@ $(function(){
 			mleft = z.mario.currentDX,
 			mtop = z.mario.currentDY,
 			mbottom = z.mario.currentDY + z.mario.currentDHeight;
+			mdirection = z.mario.direction;
 			z.collisions = [false,false,false,false];
-			for(var k=0; k < z.objects.length; k++){
-				var cur = z.objects[k];
+			
+			
+			for(var k=0; k < z.activeObjects.length; k++){
+				var cur = z.activeObjects[k];
 				if(cur.active){
-					if(mtop > cur.currentDY && mtop < cur.currentDY + cur.currentDHeight && mleft+2 < cur.currentDX + cur.currentDWidth && mright-2 > cur.currentDX){z.collisions[0] = true;}
+					if(mtop > cur.currentDY && mtop < cur.currentDY + cur.currentDHeight && mleft+2 < cur.currentDX + cur.currentDWidth && mright-2 > cur.currentDX){z.collisions[0] = true; 
+						var m = mright -8;// Math.abs((mleft+ mright)/2 - (cur.currentDX + cur.currentDX + cur.currentDWidth) / 2);
+						
+						if(m < cur.currentDX + cur.currentDWidth && m > cur.currentDX){
+							cur.hit();	
+						}
+					}
 					if(mright > cur.currentDX && mright < cur.currentDX + cur.currentDWidth && mtop < cur.currentDY + cur.currentDHeight && mbottom-2 > cur.currentDY){ z.collisions[1] = true;}
 					if(mbottom > cur.currentDY && mbottom < cur.currentDY + cur.currentDHeight && mleft+2 < cur.currentDX + cur.currentDWidth && mright-2 > cur.currentDX){z.collisions[2] = true;}
 					if(mleft > cur.currentDX && mleft < cur.currentDX + cur.currentDWidth && mtop < cur.currentDY + cur.currentDHeight && mbottom-2 > cur.currentDY){ z.collisions[3] = true;}
 				}
 			}
+			
 			mright = z.mario.bkgdPos + z.mario.currentDWidth;
 			mleft = z.mario.bkgdPos;
 			for(var k=0; k < z.floors.length; k++){
@@ -83,7 +109,10 @@ $(function(){
 			for(var k = 0; k < z.objects.length; k++){
 				z.objects[k].currentDX += 1;
 			}
-			$("#level").css({"background-position":"+=1px 0px"});
+			for(var i =0; i < z.items.length; i++){
+				z.items[i].currentDX +=1;	
+			}
+			$("#items").css({"background-position":"+=1px 0px"});
 		},
 		
 		moveWorldRight : function(){
@@ -91,12 +120,16 @@ $(function(){
 			for(var k = 0; k < z.objects.length; k++){
 				z.objects[k].currentDX -= 1;
 			}
-			$("#level").css({"background-position":"-=1px 0px"});	
+			for(var i =0; i < z.items.length; i++){
+				z.items[i].currentDX -=1;	
+			}
+			$("#items").css({"background-position":"-=1px 0px"});	
 		},
 		
 		clear : function(){
 			this.objectLevel.clearRect(0,0,240,224);
 			this.marioLevel.clearRect(0,0,240,224);
+			this.itemLevel.clearRect(0,0,240,224);
 		},
 		
 		init : function(){
@@ -107,8 +140,14 @@ $(function(){
 			$.getJSON("objects.json", function(json){
 				$.each(json, function(k,v){
 					//console.log(v);
-					var x = new gameObject('sprite.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh);
-					z.objects.push(x);
+					var x;
+					switch(v.type){
+						case "brick": 	x = new brick('sprite.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh); break;
+						case "questionmark": x = new questionmark('sprite.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh); break;
+						default : x = new gameObject('sprite.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh); break;
+					}
+					
+					if(x)z.objects.push(x);
 				});
 			});
 			
@@ -117,7 +156,7 @@ $(function(){
 			z.floors.push(new floorObject(1136,200,240,24));
 			z.floors.push(new floorObject(1424,200,1024,24));
 			z.floors.push(new floorObject(2480,200,904,24));
-			console.log(z.floors);
+			//console.log(z.floors);
 			
 			$('body').keydown(function(e){
 				var key = e.which;
@@ -235,7 +274,7 @@ $(function(){
 				z.currentSX = z.TURN; 
 				z.currentSY = z.LEFT;
 			} else { 
-				if(z.currentDX <= 35 && parseInt($("#level").css("background-position")) < 0 && !level.collisions[3]){ 
+				if(z.currentDX <= 35 && parseInt($("#items").css("background-position")) < 0 && !level.collisions[3]){ 
 					level.moveWorldLeft();
 					z.bkgdPos -= z.XVELOCITY;
 				} else if(z.currentDX > 0 && !level.collisions[3]) {
@@ -295,7 +334,7 @@ $(function(){
 				}
 				
 			}else if(level.leftDown && !level.collisions[3]){ 
-				if(z.currentDX <= 35 &&   parseInt($("#level").css("background-position")) < 0){
+				if(z.currentDX <= 35 &&   parseInt($("#items").css("background-position")) < 0){
 					level.moveWorldLeft();
 					z.bkgdPos -= z.XVELOCITY;
 				}else if(z.currentDX > 0){
@@ -377,11 +416,128 @@ $(function(){
 		z.currentDY = dy,
 		z.currentDWidth = dw,
 		z.currentDHeight = dh,
-		z.active = false;
+		z.active = false,
+		z.destroyed = false;
+		
+		z.update = function(){
+			
+		}
 		
 		z.draw = function() {
 			var z = this;
 			level.objectLevel.drawImage(z.currentImage, z.currentSX, z.currentSY, z.currentSWidth, z.currentSHeight, z.currentDX, z.currentDY, z.currentDWidth, z.currentDHeight);
+		}
+		
+		z.die = function() {
+			//console.log(this.destroyed);
+			this.destroyed = true;	
+		}
+		
+		z.hit = function(){
+			console.log("object");	
+		}
+	}
+	
+	gameItem.prototype = new gameObject();
+	gameItem.prototype.constructor = gameItem;
+	function gameItem(i, sx, sy,sw,sh,dx,dy,dw,dh){
+		gameObject.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh);
+		var z = this;
+		z.draw = function(){
+			level.itemLevel.drawImage(z.currentImage, z.currentSX, z.currentSY, z.currentSWidth, z.currentSHeight, z.currentDX, z.currentDY, z.currentDWidth, z.currentDHeight);
+		}
+	}
+	
+	coin.prototype = new gameItem();
+	gameItem.prototype.constructor = coin;
+	function coin(i, sx, sy,sw,sh,dx,dy,dw,dh){
+		gameItem.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh);
+		var z = this;
+		z.y = 0;
+		
+		z.update = function(){
+			if(z.y < z.currentDHeight){
+				z.currentDY --;
+				z.y++;	
+			}else{
+				z.destroyed = true;	
+				level.items.splice(level.items.indexOf(z),1);
+			}
+		}
+	}
+	
+	brick.prototype = new gameObject();
+	brick.prototype.constructor = brick;
+	function brick(i, sx, sy,sw,sh,dx,dy,dw,dh){
+		//gameObject.call(this);
+		gameObject.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh);
+		var z = this;
+		z.MAXBUMPHEIGHT = 8,
+		z.bump = 0,
+		z.isBumped = false;
+		
+		z.hit = function(){
+			z.isBumped = true;	
+		}
+		
+		z.update = function(){
+			if(z.isBumped){
+				if(z.bump <= z.MAXBUMPHEIGHT/2 ){
+					z.currentDY --;
+				}else{
+					z.currentDY ++;	
+				}
+				
+				if(z.bump <= z.MAXBUMPHEIGHT){
+					z.bump++;
+				}else{
+					z.bump =0;
+					z.isBumped = false;	
+				}
+			}
+		}
+	}
+	
+	questionmark.prototype = new gameObject();
+	questionmark.prototype.constructor = questionmark;
+	function questionmark(i, sx, sy,sw,sh,dx,dy,dw,dh){
+		//gameObject.call(this);
+		gameObject.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh);
+		var z = this;
+		z.MAXBUMPHEIGHT = 8,
+		z.bump = 0,
+		z.isBumped = false,
+		z.isAlive = true;
+		
+		z.hit = function(){
+			if(z.isAlive && !z.isBumped){
+				z.isBumped = true;	
+				level.items.push(new coin(z.currentImage.src, 88, 64, 14, 16, z.currentDX, z.currentDY, 14,16));
+				console.log(level.items);
+			}
+		}
+		
+		z.die = function(){
+			z.currentSX = 54,
+			z.isAlive = false;
+		}
+		
+		z.update = function(){
+			if(z.isBumped){
+				if(z.bump <= z.MAXBUMPHEIGHT/2 ){
+					z.currentDY --;
+				}else{
+					if(z.isAlive)z.die();
+					z.currentDY ++;	
+				}
+				
+				if(z.bump <= z.MAXBUMPHEIGHT){
+					z.bump++;
+				}else{
+					z.bump =0;
+					z.isBumped = false;	
+				}
+			}
 		}
 	}
 	
