@@ -3,6 +3,8 @@
 // Mario is copyright by Nintendo
 // http://www.supermariojs.com
 
+
+
 $(function(){
 	
 	var level = {
@@ -60,7 +62,7 @@ $(function(){
 			  }
 		  }
 		  
-		  if(z.mario.currentDY  > 224){
+		  if(z.mario.get('currentDY')  > 224){
 			  z.mario.die();
 		  } else {
 		  		setTimeout(function(){z.update();}, 1000/60);
@@ -69,11 +71,11 @@ $(function(){
 		
 		checkCollisions : function(){
 			var z = this,
-			mright = z.mario.currentDX + z.mario.currentDWidth,
-			mleft = z.mario.currentDX,
-			mtop = z.mario.currentDY,
-			mbottom = z.mario.currentDY + z.mario.currentDHeight;
-			mdirection = z.mario.direction;
+			mright = z.mario.get('currentDX') + z.mario.get('currentDWidth'),
+			mleft = z.mario.get('currentDX'),
+			mtop = z.mario.get('currentDY'),
+			mbottom = z.mario.get('currentDY') + z.mario.get('currentDHeight'),
+			mdirection = z.mario.get('direction');
 			z.collisions = [false,false,false,false];
 			
 			
@@ -93,8 +95,8 @@ $(function(){
 				}
 			}
 			
-			mright = z.mario.bkgdPos + z.mario.currentDWidth;
-			mleft = z.mario.bkgdPos;
+			mright = z.mario.get('bkgdPos') + z.mario.get('currentDWidth');
+			mleft = z.mario.get('bkgdPos');
 			for(var k=0; k < z.floors.length; k++){
 				var cur = z.floors[k];
 				if(mright > cur.x && mright < cur.x + cur.w && mtop < cur.y + cur.h && mbottom-2 > cur.y){ z.collisions[1] = true;}
@@ -134,8 +136,7 @@ $(function(){
 		
 		init : function(){
 			var z = this;
-			z.mario = mario;
-			z.mario.init();
+			z.mario = new mario();
 			
 			$.getJSON("objects.json", function(json){
 				$.each(json, function(k,v){
@@ -194,7 +195,7 @@ $(function(){
 		}
 	}
 	
-	var mario = {
+	var mario = Backbone.Model.extend({
 		//Constants for showing correct sprite
 		RIGHT : 0,
 		LEFT : 30,
@@ -208,192 +209,160 @@ $(function(){
 		RUN1 : 132,
 		RUN2 : 152,
 		
-		//variables for placing sprite on canvas 
-		currentImage :  new Image(),
-		currentSX : 0,
-		currentSY : 0,
-		currentSWidth: 18,
-		currentSHeight: 30,
-		currentDX : 0,
-		currentDY : 172,
-		currentDWidth : 18,
-		currentDHeight : 30,
-		bkgdPos : 0,
-		
-		direction:0, //is facing left or right
-		currentHeight: 0, //tracks jump height
-		jumpDirection:'UP',
-		isJumping: false,
-		currentFrame:1,
 		MAXTOP : 70,
 		MAXRIGHT : 175,
 		XVELOCITY : 1,
 		YVELOCITY : 2,
 		
+		defaults : {
+			//variables for placing sprite on canvas 
+			currentImage :  new Image(),
+			currentSX : 0,
+			currentSY : 0,
+			currentSWidth: 18,
+			currentSHeight: 30,
+			currentDX : 0,
+			currentDY : 172,
+			currentDWidth : 18,
+			currentDHeight : 30,
+			bkgdPos : 0,
+			
+			direction:0, //is facing left or right
+			currentHeight: 0, //tracks jump height
+			jumpDirection:'UP',
+			isJumping: false,
+			currentFrame:1
+		},
+		
 		moveRight : function(){
 			var z = this;
 			
-			if(z.direction == z.LEFT && !z.isJumping){
-				z.direction = z.RIGHT;
-				z.currentSX = z.TURN; 
-				z.currentSY = z.RIGHT;
+			if(z.get('direction') == z.LEFT && !z.get('isJumping')){
+				z.set({direction:z.RIGHT, currentSX:z.TURN, currentSY:z.RIGHT});
 			} else{
-				if(z.currentDX < z.MAXRIGHT && !level.collisions[1]){
-					z.currentDX += z.XVELOCITY;	
-					z.bkgdPos += z.XVELOCITY;
-				} else if(!level.collisions[1]){
+				if(z.get('currentDX') < z.MAXRIGHT && !level.collisions[1]){ //move the sprite right
+					z.set({currentDX: z.get('currentDX') + z.XVELOCITY, bkgdPos : z.get('bkgdPos') + z.XVELOCITY});	
+				} else if(!level.collisions[1]){ //move the world right
 					level.moveWorldRight();
-					z.bkgdPos += z.XVELOCITY;
+					z.set({bkgdPos : z.get('bkgdPos') + z.XVELOCITY});
 				}
 				
-				
-				if(!level.collisions[2]){
-					z.currentSX = z.JUMP;
-					z.currentDY += z.YVELOCITY;
-					z.currentHeight -= z.YVELOCITY;
-					z.jumpDirection = "DOWN";
-				}else{
-					 if(z.currentFrame < 6){
-						z.currentSX = z.WALK2;
+				var cf = z.get('currentFrame');
+				if(!level.collisions[2]){ //we have not hit a floor so we are falling
+					z.set({currentSX:z.JUMP, currentDY: z.get('currentDY')+z.YVELOCITY, currentHeight: z.get('currentHeight')-z.YVELOCITY, jumpDirection:"DOWN"}); 
+				}else{ //we are walking
+					 if(cf < 6){
+						z.set({currentSX : z.WALK2, isJumping:false});
 					}else{
-						z.currentSX = z.WALK1;
+						z.set({currentSX : z.WALK1, isJumping:false});
 					}
-					z.isJumping = false;
+					//z.isJumping = false;
 				}
-				if(z.currentFrame == 10){ z.currentFrame = 1; }
-				else {z.currentFrame++; }
+				if(cf == 10){ z.set({currentFrame : 1}); }
+				else {z.set({currentFrame:cf+1}); }
 			}
 		},
 		
 		moveLeft : function(){
 			var z = this,
-			collided = level.collisions[3];
+			curDX = z.get('currentDX');
 			
-			if(z.direction == z.RIGHT && !z.isJumping){
-				z.direction = z.LEFT;
-				z.currentSX = z.TURN; 
-				z.currentSY = z.LEFT;
+			if(z.get('direction') == z.RIGHT && !z.get('isJumping')){
+				z.set({direction:z.LEFT, currentSX:z.TURN, currentSY:z.LEFT});
 			} else { 
-				if(z.currentDX <= 35 && parseInt($("#items").css("background-position")) < 0 && !level.collisions[3]){ 
+				if(curDX <= 35 && parseInt($("#items").css("background-position")) < 0 && !level.collisions[3]){ 
 					level.moveWorldLeft();
-					z.bkgdPos -= z.XVELOCITY;
-				} else if(z.currentDX > 0 && !level.collisions[3]) {
-					z.currentDX -= z.XVELOCITY;
-					z.bkgdPos -= z.XVELOCITY;
+					z.set({bkgdPos: z.get('bkgdPos') - z.XVELOCITY});
+				} else if(curDX > 0 && !level.collisions[3]) {
+					z.set({currentDX:curDX-z.XVELOCITY, bkgdPos:z.get('bkgdPos')-z.XVELOCITY});
 				} 
 				
+				var csx,
+					cf = z.get('currentFrame');
 				if(!level.collisions[2]){
-					z.currentSX = z.JUMP;
-					z.currentDY += z.YVELOCITY;
-					z.currentHeight -= z.YVELOCITY;
-					z.jumpDirection = "DOWN";
+					z.set({currentSX:z.JUMP, jumpDirection:"DOWN", currentDY:z.get('currentDY')+z.YVELOCITY, currentHeight:z.get('currentHeight')-z.YVELOCITY});
 				}else{ 
-					if(z.currentFrame < 6){
-						z.currentSX = z.WALK2;
+					if(cf < 6){
+						csx = z.WALK2;
 					}else{
-						z.currentSX = z.WALK1;
+						csx = z.WALK1;
 					}
-					z.isJumping = false;
-				}
-				if(z.currentFrame == 10){z.currentFrame = 1;}
-				else{z.currentFrame++;}
+					z.set({isJumping:false, currentSX:csx});
+				} 
+				if(cf == 10){z.set({currentFrame : 1});}
+				else{z.set({currentFrame:cf+1});}
 			}
 		},
 		
 		jump : function(){
-			var z = this;
+			var z = this,
+			curH = z.get('currentHeight'),
+			curDY = z.get('currentDY'),
+			curDX = z.get('currentDX'),
+			curBP = z.get('bkgdPos');
 			
-			z.currentSX = z.JUMP; 
-			z.isJumping = true;
-			
-			if(z.jumpDirection == "UP" ){
-				if(z.currentHeight < z.MAXTOP && !level.collisions[0]){
-					z.currentDY -= z.YVELOCITY;
-					z.currentHeight += z.YVELOCITY;
+			z.set({currentSX : z.JUMP, isJumping:true}); 
+			//console.log(curH, z.MAXTOP);
+			if(z.get('jumpDirection') === "UP" ){
+				if(curH < z.MAXTOP && !level.collisions[0]){
+					z.set({currentDY:curDY-z.YVELOCITY, currentHeight:curH+z.YVELOCITY});
 				}else{
-					z.jumpDirection = "DOWN";	
+					z.set({jumpDirection : "DOWN"});	
 				}
 			} else {
 				if( !level.collisions[2]){
-					z.currentDY += z.YVELOCITY;
-					z.currentHeight -= z.YVELOCITY;
-					z.jumpDirection = "DOWN";
+					z.set({currentDY:curDY+z.YVELOCITY, currentHeight:curH-z.YVELOCITY, jumpDirection:"DOWN"});	
 				}else{
-					z.currentHeight = 0;
-					z.jumpDirection = "UP";
-					z.isJumping = false;
+					z.set({currentHeight:0, jumpDirection:"UP", isJumping:false});
 				}
 			}
 			if(level.rightDown && !level.collisions[1]){ 
-				if(z.currentDX < z.MAXRIGHT){
-					z.currentDX += z.XVELOCITY;
-					z.bkgdPos += z.XVELOCITY;
+				if(curDX < z.MAXRIGHT){
+					z.set({currentDX:curDX+z.XVELOCITY, bkgdPos: curBP+z.XVELOCITY});
 				}else{
 					level.moveWorldRight();
-					z.bkgdPos += z.XVELOCITY;
+					z.set({bkgdPos:curBP+z.XVELOCITY});
 				}
 				
 			}else if(level.leftDown && !level.collisions[3]){ 
-				if(z.currentDX <= 35 &&   parseInt($("#items").css("background-position")) < 0){
+				if(curDX <= 35 &&   parseInt($("#items").css("background-position")) < 0){
 					level.moveWorldLeft();
-					z.bkgdPos -= z.XVELOCITY;
-				}else if(z.currentDX > 0){
-					z.currentDX -= z.XVELOCITY;	
-					z.bkgdPos -= z.XVELOCITY;
+					z.set({bkgdPos : curBP - z.XVELOCITY});
+				}else if(curDX > 0){
+					z.set({currentDX:curDX-z.XVELOCITY, bkgdPos:curBP-z.XVELOCITY});
 				}
 				
 			}
 			
 		},
 		stand : function(){
-			var z = this;
+			var z = this,
+			curDY = z.get('currentDY'),
+			curH = z.get('currentHeight');
 			
 			if(!level.collisions[2]){
-				z.currentDY += z.YVELOCITY;
-				z.currentHeight -= z.YVELOCITY;
-				z.jumpDirection = "DOWN";
-			} else if( z.isJumping){
-				z.currentHeight = 0;
-				z.jumpDirection = "UP";
-				z.isJumping = false;
+				z.set({currentDY: curDY+z.YVELOCITY, currentHeight:curH-z.YVELOCITY, jumpDirection:"DOWN"});
+			} else if( z.get('isJumping')){
+				z.set({currentHeight:0, jumpDirection:"UP", isJumping:false});
 			}else if(!level.rightDown && !level.leftDown){
-				z.currentSX = z.STAND;
-				z.currentFrame = 1;
-				z.currentHeight = 0;
-				z.isJumping = false;
+				z.set({currentSX:z.STAND, currentFrame:1, currentHeight:0, isJumping:false});
 			}
 			
 		},
-		/*runRight : function(){
-			var z = this;
-			var left = z.mario.css("left");
-			console.log("run");
-			if(left.substr(0,left.indexOf("px")) > 0) {
-				z.mario.animate({"left":"+=25px"},400,function(){
-					z.canAnimate = true;	
-				});
-				
-				z.change(z.RUN, z.direction); 
-				setTimeout(function(){z.change(z.RUN1,z.direction);},100);
-				setTimeout(function(){z.change(z.RUN2,z.direction);},200);
-				setTimeout(function(){z.change(z.RUN1,z.direction);},300);
-				
-			} else {
-				z.canAnimate = true;	
-			}
-		},*/
 		
-		init : function(){
-			var z = this;
-			z.currentImage.src = "sprite.png";
-			z.currentImage.onload = function(){
+		initialize : function(){
+			var z = this,
+			ci = z.get('currentImage');
+			ci.src = "sprite.png";
+			ci.onload = function(){
 				z.draw();
 			}	
+			z.set({currentImage:ci});
 		},
 		
 		draw : function(){
 			var z = this;
-			level.marioLevel.drawImage(z.currentImage, z.currentSX, z.currentSY, z.currentSWidth, z.currentSHeight, z.currentDX, z.currentDY, z.currentDWidth, z.currentDHeight);	
+			level.marioLevel.drawImage(z.get('currentImage'), z.get('currentSX'), z.get('currentSY'), z.get('currentSWidth'), z.get('currentSHeight'), z.get('currentDX'), z.get('currentDY'), z.get('currentDWidth'), z.get('currentDHeight'));	
 		},
 		
 		die : function(){
@@ -401,7 +370,7 @@ $(function(){
 			
 			window.location.reload();	
 		}
-	}
+	});
 	
 	function gameObject(i, sx, sy, sw, sh, dx, dy, dw, dh) {
 		
@@ -513,7 +482,7 @@ $(function(){
 			if(z.isAlive && !z.isBumped){
 				z.isBumped = true;	
 				level.items.push(new coin(z.currentImage.src, 88, 64, 14, 16, z.currentDX, z.currentDY, 14,16));
-				console.log(level.items);
+				//console.log(level.items);
 			}
 		}
 		
