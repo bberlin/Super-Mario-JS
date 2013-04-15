@@ -78,8 +78,19 @@ $(function(){
 			mdirection = z.mario.get('direction');
 			z.collisions = [false,false,false,false];
 			
+			for(var i =0; i < z.items.length; i++){
+				var item = z.items[i],
+				itop = item.currentDY,
+				ileft = item.currentDX,
+				ibottom = item.currentDY + item.currentDHeight,
+				iright = item.currentDX + item.currentDWidth;
+				z.items[i].collisions = [false, false, false, false];
+				if(item.ready && mright > ileft && mleft < iright && mbottom > itop && mtop < ibottom){
+					item.hit();
+				} 
+			}
 			
-			for(var k=0; k < z.activeObjects.length; k++){
+			for(var k=0; k < z.activeObjects.length; k++){ 
 				var cur = z.activeObjects[k];
 				if(cur.active){
 					if(mtop > cur.currentDY && mtop < cur.currentDY + cur.currentDHeight && mleft+2 < cur.currentDX + cur.currentDWidth && mright-2 > cur.currentDX){z.collisions[0] = true; 
@@ -92,6 +103,20 @@ $(function(){
 					if(mright > cur.currentDX && mright < cur.currentDX + cur.currentDWidth && mtop < cur.currentDY + cur.currentDHeight && mbottom-2 > cur.currentDY){ z.collisions[1] = true;}
 					if(mbottom > cur.currentDY && mbottom < cur.currentDY + cur.currentDHeight && mleft+2 < cur.currentDX + cur.currentDWidth && mright-2 > cur.currentDX){z.collisions[2] = true;}
 					if(mleft > cur.currentDX && mleft < cur.currentDX + cur.currentDWidth && mtop < cur.currentDY + cur.currentDHeight && mbottom-2 > cur.currentDY){ z.collisions[3] = true;}
+					
+					for(var i =0; i < z.items.length; i++){
+						var item = z.items[i],
+						itop = item.currentDY,
+						ileft = item.currentDX,
+						ibottom = item.currentDY + item.currentDHeight,
+						iright = item.currentDX + item.currentDWidth;
+						
+						if(itop > cur.currentDY && itop < cur.currentDY + cur.currentDHeight && ileft+2 < cur.currentDX + cur.currentDWidth && iright-2 > cur.currentDX){z.items[i].collisions[0]=true;}
+						if(iright > cur.currentDX && iright < cur.currentDX + cur.currentDWidth && itop < cur.currentDY + cur.currentDHeight && ibottom-2 > cur.currentDY){ z.items[i].collisions[1] = true;}
+						if(ibottom > cur.currentDY && ibottom < cur.currentDY + cur.currentDHeight && ileft+2 < cur.currentDX + cur.currentDWidth && iright-2 > cur.currentDX){z.items[i].collisions[2] = true;}
+						if(ileft > cur.currentDX && ileft < cur.currentDX + cur.currentDWidth && itop < cur.currentDY + cur.currentDHeight && ibottom-2 > cur.currentDY){ z.items[i].collisions[3] = true;}
+					}
+					
 				}
 			}
 			
@@ -102,7 +127,17 @@ $(function(){
 				if(mright > cur.x && mright < cur.x + cur.w && mtop < cur.y + cur.h && mbottom-2 > cur.y){ z.collisions[1] = true;}
 				if(mbottom > cur.y && mbottom < cur.y + cur.h && mleft+2 < cur.x + cur.w && mright-2 > cur.x ){z.collisions[2] = true;}
 				if(mleft > cur.x && mleft < cur.x + cur.w && mtop < cur.y + cur.h && mbottom-2 > cur.y){ z.collisions[3] = true;}
+				for(var i =0; i < z.items.length; i++){
+					var item = z.items[i],
+					ileft = item.currentDX,
+					ibottom = item.currentDY + item.currentDHeight,
+					iright = item.currentDX + item.currentDWidth;
+					
+					if(ibottom > cur.y && ibottom < cur.y + cur.h && ileft+2 < cur.x + cur.w && iright-2 > cur.x ){z.items[i].collisions[2] = true;}
+				}
 			}
+			
+			
 			
 		},
 		
@@ -143,9 +178,12 @@ $(function(){
 					//console.log(v);
 					var x;
 					switch(v.type){
-						case "brick": 	x = new brick('sprite.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh); break;
-						case "questionmark": x = new questionmark('sprite.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh); break;
-						default : x = new gameObject('sprite.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh); break;
+						case "brick": 	x = new brick('objects.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh); break;
+						case "questionmark": 
+							var r = v.reward ? v.reward : "coin";
+							x = new questionmark('objects.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh, r); 
+						break;
+						default : x = new gameObject('objects.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh); break;
 					}
 					
 					if(x)z.objects.push(x);
@@ -220,13 +258,14 @@ $(function(){
 			currentSX : 0,
 			currentSY : 0,
 			currentSWidth: 18,
-			currentSHeight: 30,
+			currentSHeight: 17,
 			currentDX : 0,
-			currentDY : 172,
+			currentDY : 184,
 			currentDWidth : 18,
-			currentDHeight : 30,
+			currentDHeight : 17,
 			bkgdPos : 0,
 			
+			size:'small',
 			direction:0, //is facing left or right
 			currentHeight: 0, //tracks jump height
 			jumpDirection:'UP',
@@ -353,7 +392,7 @@ $(function(){
 		initialize : function(){
 			var z = this,
 			ci = z.get('currentImage');
-			ci.src = "sprite.png";
+			ci.src = "mario.png";
 			ci.onload = function(){
 				z.draw();
 			}	
@@ -361,8 +400,20 @@ $(function(){
 		},
 		
 		draw : function(){
+			var z = this,
+			sizeOffset = 71;
+			if(z.get('size') == "big"){
+				sizeOffset = 0;
+			}
+			level.marioLevel.drawImage(z.get('currentImage'), z.get('currentSX'), z.get('currentSY')+sizeOffset, z.get('currentSWidth'), z.get('currentSHeight'), z.get('currentDX'), z.get('currentDY'), z.get('currentDWidth'), z.get('currentDHeight'));	
+		},
+		
+		setSize : function(size){
 			var z = this;
-			level.marioLevel.drawImage(z.get('currentImage'), z.get('currentSX'), z.get('currentSY'), z.get('currentSWidth'), z.get('currentSHeight'), z.get('currentDX'), z.get('currentDY'), z.get('currentDWidth'), z.get('currentDHeight'));	
+			if(size == "big"){
+				var dy = z.get("currentDY");
+				z.set({size :  "big", currentSHeight : 28, currentDY : dy-11, currentDHeight : 28});
+			}
 		},
 		
 		die : function(){
@@ -412,8 +463,13 @@ $(function(){
 	function gameItem(i, sx, sy,sw,sh,dx,dy,dw,dh){
 		gameObject.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh);
 		var z = this;
+		z.collisions = [false, false, false, false];
 		z.draw = function(){
 			level.itemLevel.drawImage(z.currentImage, z.currentSX, z.currentSY, z.currentSWidth, z.currentSHeight, z.currentDX, z.currentDY, z.currentDWidth, z.currentDHeight);
+		}
+		z.die = function(){
+			this.destroyed = true;
+			level.items.splice(level.items.indexOf(z), 1);
 		}
 	}
 	
@@ -429,9 +485,51 @@ $(function(){
 				z.currentDY --;
 				z.y++;	
 			}else{
-				z.destroyed = true;	
-				level.items.splice(level.items.indexOf(z),1);
+				z.die();
 			}
+		}
+	}
+	
+	mushroom.prototype = new gameItem();
+	gameItem.prototype.constructor = mushroom;
+	function mushroom(i, sx, sy,sw,sh,dx,dy,dw,dh){
+		gameItem.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh);
+		var z = this;
+		z.y = 0,
+		z.rightDirection = true
+		z.ready = false;
+		
+		z.update = function(){
+			if(z.y < z.currentDHeight){
+				z.currentDY --;
+				z.y++;	
+			}else{
+				if(!z.ready){z.ready = true;}
+				if(!z.collisions[2]){
+					z.currentDY +=2;
+				}
+				if(z.collisions[1] && z.rightDirection){
+					z.rightDirection = false;
+				}
+				else if(z.collisions[3] && !z.rightDirection){
+					z.rightDirection = true;
+				}
+				if(z.rightDirection){
+					z.currentDX++;
+				}else{
+					z.currentDX--;
+				}
+				
+			}
+			
+			if(z.currentDY > 224 || z.currentDX > 224 || z.currentDX < 0){
+				z.die();
+			}
+		}
+		
+		z.hit = function(){
+			level.mario.setSize("big");
+			z.die();
 		}
 	}
 	
@@ -469,7 +567,7 @@ $(function(){
 	
 	questionmark.prototype = new gameObject();
 	questionmark.prototype.constructor = questionmark;
-	function questionmark(i, sx, sy,sw,sh,dx,dy,dw,dh){
+	function questionmark(i, sx, sy,sw,sh,dx,dy,dw,dh, reward){
 		//gameObject.call(this);
 		gameObject.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh);
 		var z = this;
@@ -480,8 +578,12 @@ $(function(){
 		
 		z.hit = function(){
 			if(z.isAlive && !z.isBumped){
-				z.isBumped = true;	
-				level.items.push(new coin(z.currentImage.src, 88, 64, 14, 16, z.currentDX, z.currentDY, 14,16));
+				z.isBumped = true;
+				if(reward == "mushroom"){
+					level.items.push(new mushroom(z.currentImage.src, 104,0,16,16,z.currentDX, z.currentDY,16,16));
+				}else{	
+					level.items.push(new coin(z.currentImage.src, 88, 0, 14, 16, z.currentDX, z.currentDY, 14,16));
+				}
 				//console.log(level.items);
 			}
 		}
