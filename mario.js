@@ -18,7 +18,10 @@ $(function(){
 		activeObjects : [],
 		items : [],
 		floors : [],
+		enemies : [],
+		activeEnemies : [],
 		objectLevel : document.getElementById("level").getContext("2d"),
+		enemyLevel : document.getElementById("enemies").getContext("2d"),
 		marioLevel : document.getElementById("mario").getContext("2d"),
 		itemLevel : document.getElementById("items").getContext("2d"),
 		collisions : [false,false,false,false], //top,right,bottom,left
@@ -39,13 +42,32 @@ $(function(){
 		  z.clear()
 		  z.mario.draw();
 		 
+		  for(var e = 0; e < z.enemies.length; e++){
+			  var enemy = z.enemies[e],
+			  edx = enemy.get('currentDX'),
+			  esw = enemy.get('currentSWidth'),
+			  active = enemy.get('active');
+			  //console.log(edx);
+			  if(!enemy.get('destroyed') &&  edx > (0 - esw) && edx <= 225 + esw){
+			  	 enemy.update();
+				 enemy.draw();
+				 enemy.set('active', true);
+				 z.activeEnemies.push(enemy);
+			  }else if(active){
+				 enemy.set('active', false);
+				 z.activeEnemies.splice(z.activeEnemies.indexOf(enemy),1);
+			  }
+		  }
+		 
 		  for(var k = 0; k < z.objects.length; k++){
 			  var cur = z.objects[k];
 			  if(!cur.destroyed && cur.currentDX > (0 - cur.currentSWidth) && cur.currentDX <= 225 + cur.currentSWidth){
 				  cur.update();
 				  cur.draw();
 			      cur.active = true;
-				  z.activeObjects.push(cur);
+			      if(!cur.ignore){
+					  z.activeObjects.push(cur);
+				  }
 			  } else if(cur.active){
 					cur.active = false;
 					z.activeObjects.splice(z.objects.indexOf(cur),1);  
@@ -120,6 +142,30 @@ $(function(){
 				}
 			}
 			
+			for(var e=0; e < z.activeEnemies.length; e++){
+				var enemy = z.activeEnemies[e],
+				etop = enemy.get('currentDY'),
+				eleft = enemy.get('currentDX'),
+				ebottom = etop + enemy.get('currentDHeight'),
+				eright = eleft + enemy.get('currentDWidth'),
+				isDying = enemy.get('dying');
+				
+				if(!isDying){
+  				if(mbottom > etop && mbottom < etop+5 && ((mright < eright && mright > eleft) || (mleft > eleft && mleft < eright))){
+  					enemy.hit();
+  					z.mario.bounce();			
+  				}
+  				else if((mright > eleft && mright < eleft+5 || mleft < eright && mleft > eright-5) && mtop < ebottom  && mbottom > etop){z.mario.hit();
+  				}
+				}
+				/*
+if(etop > mtop && etop < mbottom && eleft+2 < mright && eright-2 > mleft){enemy.hit();}
+				if(eright > mleft && eright < mright && etop < mbottom && ebottom-2 > mtop){ console.log("RIGHT");}
+				if(ebottom > mtop && ebottom < mbottom && eleft+2 < mright && eright-2 > mleft){console.log("BOTTOM");}
+				if(eleft > mleft && ileft < mright && etop < mbottom && ebottom-2 > mbottom){ console.log("LEFT");}
+*/
+			}
+			
 			mright = z.mario.get('bkgdPos') + z.mario.get('currentDWidth');
 			mleft = z.mario.get('bkgdPos');
 			for(var k=0; k < z.floors.length; k++){
@@ -149,6 +195,11 @@ $(function(){
 			for(var i =0; i < z.items.length; i++){
 				z.items[i].currentDX +=1;	
 			}
+			for(var e =0; e < z.enemies.length; e++){
+				var dx = z.enemies[e].get('currentDX');
+				dx += 1;
+				z.enemies[e].set('currentDX', dx);
+			}
 			$("#items").css({"background-position":"+=1px 0px"});
 		},
 		
@@ -160,6 +211,11 @@ $(function(){
 			for(var i =0; i < z.items.length; i++){
 				z.items[i].currentDX -=1;	
 			}
+			for(var e =0; e < z.enemies.length; e++){
+				var dx = z.enemies[e].get('currentDX');
+				dx -= 1;
+				z.enemies[e].set('currentDX', dx)
+			}
 			$("#items").css({"background-position":"-=1px 0px"});	
 		},
 		
@@ -167,28 +223,40 @@ $(function(){
 			this.objectLevel.clearRect(0,0,240,224);
 			this.marioLevel.clearRect(0,0,240,224);
 			this.itemLevel.clearRect(0,0,240,224);
+			this.enemyLevel.clearRect(0,0,240,224);
 		},
 		
 		init : function(){
+			console.log("START");
 			var z = this;
 			z.mario = new mario();
 			
 			$.getJSON("objects.json", function(json){
+				//console.log("OBJECTS",json);
 				$.each(json, function(k,v){
 					//console.log(v);
-					var x;
+					var x,
+					ig = v.ignore ? true : false;
 					switch(v.type){
-						case "brick": 	x = new brick('objects.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh); break;
+						case "brick": 	x = new brick('objects.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh, ig); break;
 						case "questionmark": 
 							var r = v.reward ? v.reward : "coin";
-							x = new questionmark('objects.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh, r); 
+							x = new questionmark('objects.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh, ig, r); 
 						break;
-						default : x = new gameObject('objects.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh); break;
+						default : x = new gameObject('objects.png', v.sx, v.sy, v.sw, v.sh, v.dx, v.dy, v.dw, v.dh, ig); break;
 					}
 					
 					if(x)z.objects.push(x);
 				});
 			});
+			
+			$.getJSON("enemies.json", function(json){
+				
+				$.each(json, function(k,v){
+					z.enemies.push(new goomba(v));
+				});
+			});
+			
 			
 			//var d = new floorObject(0,200, 1104,24);
 			z.floors.push(new floorObject(0,200, 1104,24));
@@ -229,6 +297,7 @@ $(function(){
 					z.shiftDown = false;	
 				}
 			});
+			
 			z.update();
 		}
 	}
@@ -270,7 +339,9 @@ $(function(){
 			currentHeight: 0, //tracks jump height
 			jumpDirection:'UP',
 			isJumping: false,
-			currentFrame:1
+			isBouncing: false,
+			currentFrame:1,
+			invincible:0
 		},
 		
 		moveRight : function(){
@@ -297,8 +368,10 @@ $(function(){
 					}
 					//z.isJumping = false;
 				}
-				if(cf == 10){ z.set({currentFrame : 1}); }
+				/*
+if(cf == 10){ z.set({currentFrame : 1}); }
 				else {z.set({currentFrame:cf+1}); }
+*/
 			}
 		},
 		
@@ -328,8 +401,10 @@ $(function(){
 					}
 					z.set({isJumping:false, currentSX:csx});
 				} 
-				if(cf == 10){z.set({currentFrame : 1});}
+				/*
+if(cf == 10){z.set({currentFrame : 1});}
 				else{z.set({currentFrame:cf+1});}
+*/
 			}
 		},
 		
@@ -374,6 +449,10 @@ $(function(){
 			}
 			
 		},
+		bounce : function() {
+		  var z = this;
+      z.set({"jumpDirection": "UP"});
+		},
 		stand : function(){
 			var z = this,
 			curDY = z.get('currentDY'),
@@ -384,7 +463,7 @@ $(function(){
 			} else if( z.get('isJumping')){
 				z.set({currentHeight:0, jumpDirection:"UP", isJumping:false});
 			}else if(!level.rightDown && !level.leftDown){
-				z.set({currentSX:z.STAND, currentFrame:1, currentHeight:0, isJumping:false});
+				z.set({currentSX:z.STAND, currentHeight:0, isJumping:false});
 			}
 			
 		},
@@ -405,6 +484,19 @@ $(function(){
 			if(z.get('size') == "big"){
 				sizeOffset = 0;
 			}
+			var inv = z.get('invincible'),
+			cf = z.get('currentFrame');
+			//console.log(cf);
+			if(inv > 0){
+  			if(cf < 6){ level.marioLevel.globalAlpha = 0.5; }
+  			else{ level.marioLevel.globalAlpha = 1; }
+  			if(inv < 60){ inv ++;
+  			}else{ inv = 0; }
+			}
+			if(cf == 10){ cf = 1;
+			}else{ cf ++; }
+			
+			z.set({"currentFrame":cf, "invincible":inv});
 			level.marioLevel.drawImage(z.get('currentImage'), z.get('currentSX'), z.get('currentSY')+sizeOffset, z.get('currentSWidth'), z.get('currentSHeight'), z.get('currentDX'), z.get('currentDY'), z.get('currentDWidth'), z.get('currentDHeight'));	
 		},
 		
@@ -413,6 +505,23 @@ $(function(){
 			if(size == "big"){
 				var dy = z.get("currentDY");
 				z.set({size :  "big", currentSHeight : 28, currentDY : dy-11, currentDHeight : 28});
+			}else if(size == "small"){
+				var dy = z.get("currentDY");
+				z.set({size : "small", currentSHeight : 17, currentDY : dy+11, currentDHeight : 17});
+			}
+		},
+		
+		hit : function(){
+			var z = this,
+			curSize = z.get("size"),
+			inv = z.get("invincible");
+			if(inv == 0){
+  			if(curSize == "big"){
+  				z.setSize("small");
+  				z.set({"invincible":1});
+  			}else{
+  				z.die();
+  			}
 			}
 		},
 		
@@ -423,7 +532,137 @@ $(function(){
 		}
 	});
 	
-	function gameObject(i, sx, sy, sw, sh, dx, dy, dw, dh) {
+	var enemy = Backbone.Model.extend({
+	
+		defaults : {
+			//variables for placing sprite on canvas 
+			currentImage :  new Image(),
+			currentSX : 0,
+			currentSY : 0,
+			currentSWidth: 18,
+			currentSHeight: 17,
+			currentDX : 0,
+			currentDY : 184,
+			currentDWidth : 18,
+			currentDHeight : 17,
+			bkgdPos : 0,
+			type : "goomba",
+			
+			rightDirection:false, //is facing left or right
+			currentFrame:1,
+			collisions:[false,false,false,false],
+			destroyed:false,
+			active:false,
+			dying:false
+		},
+		
+		initialize : function(attributes, options){
+			var z = this;
+			z.set(attributes);
+			var img = z.get('currentImage');
+			img.src = "enemies.png";
+		},
+		
+		update : function(){
+			var z = this;
+			z.checkCollisions();
+			var collisions = z.get('collisions'),
+			curDY = z.get('currentDY'),
+			curDX = z.get('currentDX'),
+			rd = z.get('rightDirection');
+			
+			if(!collisions[2]){
+				z.set('currentDY', curDY+2);
+			}
+			if(collisions[1] && rd){
+				z.set('rightDirection', false);
+			}
+			else if(collisions[3] && !rd){
+				z.set('rightDirection', true);
+			}
+			if(z.get('rightDirection')){
+				z.set('currentDX', curDX+.5);
+			}else{
+				z.set('currentDX', curDX-.5);
+			}
+		},
+		
+		checkCollisions : function(){
+			var z = this,
+			eright = z.get('currentDX') + z.get('currentDWidth'),
+			eleft = z.get('currentDX'),
+			etop = z.get('currentDY'),
+			ebottom = z.get('currentDY') + z.get('currentDHeight'),
+			edirection = z.get('direction'),
+			newCollisions = [false,false,false,false];
+			
+			for(var k=0; k < level.activeObjects.length; k++){ 
+				var cur = level.activeObjects[k];
+				if(cur.active){
+					
+					if(etop > cur.currentDY && etop < cur.currentDY + cur.currentDHeight && eleft+2 < cur.currentDX + cur.currentDWidth && eright-2 > cur.currentDX){newCollisions[0] = true;}
+					if(eright > cur.currentDX && eright < cur.currentDX + cur.currentDWidth && etop < cur.currentDY + cur.currentDHeight && ebottom-2 > cur.currentDY){ newCollisions[1] = true; }
+					if(ebottom > cur.currentDY && ebottom < cur.currentDY + cur.currentDHeight && eleft+2 < cur.currentDX + cur.currentDWidth && eright-2 > cur.currentDX){newCollisions[2] = true;}
+					if(eleft > cur.currentDX && eleft < cur.currentDX + cur.currentDWidth && etop < cur.currentDY + cur.currentDHeight && ebottom-2 > cur.currentDY){ newCollisions[3] = true; }
+				}
+			}
+			for(var k=0; k < level.floors.length; k++){
+				var cur = level.floors[k];
+				if(eright > cur.x && eright < cur.x + cur.w && etop < cur.y + cur.h && ebottom-2 > cur.y){ newCollisions[1] = true;}
+				if(ebottom > cur.y && ebottom < cur.y + cur.h && eleft+2 < cur.x + cur.w && eright-2 > cur.x ){newCollisions[2] = true;}
+				if(eleft > cur.x && eleft < cur.x + cur.w && etop < cur.y + cur.h && ebottom-2 > cur.y){ newCollisions[3] = true;}
+				
+			}
+			
+			z.set('collisions', newCollisions);
+		},
+		
+		draw : function() {
+			var z = this;
+			level.enemyLevel.drawImage(z.get('currentImage'), z.get('currentSX'), z.get('currentSY'), z.get('currentSWidth'), z.get('currentSHeight'), z.get('currentDX'), z.get('currentDY'), z.get('currentDWidth'), z.get('currentDHeight'));	
+		},
+		
+		hit : function() {
+			this.set('destroyed', true);
+		}
+	});
+	
+	var goomba = enemy.extend({
+		currentFrame: 1,
+		LEFT : 0,
+		RIGHT : 16,
+		DEAD : 32,
+		
+		update : function(){
+			var z = this;
+			if(!z.get('dying')){
+				enemy.prototype.update.apply(this);
+				var collisions = z.get('collisions');
+				
+				var csx = z.LEFT;
+				if(z.currentFrame > 6){
+					csx = z.RIGHT;
+				}
+				z.set({currentSX:csx});
+				
+				if(z.currentFrame == 12){z.currentFrame = 1;}
+				else{z.currentFrame ++;}
+			} else { //if dying
+				if(z.currentFrame <= 15){
+					z.currentFrame++;
+				}else{
+					z.set('destroyed', true);
+				}
+			}
+		},
+		hit : function(){
+			var z = this;
+			z.set({'currentSX': z.DEAD, 'active':false, 'dying':true});
+			z.currentFrame = 1;
+		}
+	});
+	
+	function gameObject(i, sx, sy, sw, sh, dx, dy, dw, dh, ig) {
 		
 		var z = this;
 		z.currentImage = new Image();
@@ -437,7 +676,8 @@ $(function(){
 		z.currentDWidth = dw,
 		z.currentDHeight = dh,
 		z.active = false,
-		z.destroyed = false;
+		z.destroyed = false,
+		z.ignore = ig;
 		
 		z.update = function(){
 			
@@ -460,8 +700,8 @@ $(function(){
 	
 	gameItem.prototype = new gameObject();
 	gameItem.prototype.constructor = gameItem;
-	function gameItem(i, sx, sy,sw,sh,dx,dy,dw,dh){
-		gameObject.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh);
+	function gameItem(i, sx, sy,sw,sh,dx,dy,dw,dh,ig){
+		gameObject.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh,ig);
 		var z = this;
 		z.collisions = [false, false, false, false];
 		z.draw = function(){
@@ -475,8 +715,8 @@ $(function(){
 	
 	coin.prototype = new gameItem();
 	gameItem.prototype.constructor = coin;
-	function coin(i, sx, sy,sw,sh,dx,dy,dw,dh){
-		gameItem.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh);
+	function coin(i, sx, sy,sw,sh,dx,dy,dw,dh,ig){
+		gameItem.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh,ig);
 		var z = this;
 		z.y = 0;
 		
@@ -492,8 +732,8 @@ $(function(){
 	
 	mushroom.prototype = new gameItem();
 	gameItem.prototype.constructor = mushroom;
-	function mushroom(i, sx, sy,sw,sh,dx,dy,dw,dh){
-		gameItem.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh);
+	function mushroom(i, sx, sy,sw,sh,dx,dy,dw,dh,ig){
+		gameItem.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh,ig);
 		var z = this;
 		z.y = 0,
 		z.rightDirection = true
@@ -515,9 +755,9 @@ $(function(){
 					z.rightDirection = true;
 				}
 				if(z.rightDirection){
-					z.currentDX++;
+					z.currentDX+= 0.75;
 				}else{
-					z.currentDX--;
+					z.currentDX-= 0.75;
 				}
 				
 			}
@@ -535,9 +775,9 @@ $(function(){
 	
 	brick.prototype = new gameObject();
 	brick.prototype.constructor = brick;
-	function brick(i, sx, sy,sw,sh,dx,dy,dw,dh){
+	function brick(i, sx, sy,sw,sh,dx,dy,dw,dh,ig){
 		//gameObject.call(this);
-		gameObject.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh);
+		gameObject.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh,ig);
 		var z = this;
 		z.MAXBUMPHEIGHT = 8,
 		z.bump = 0,
@@ -567,9 +807,9 @@ $(function(){
 	
 	questionmark.prototype = new gameObject();
 	questionmark.prototype.constructor = questionmark;
-	function questionmark(i, sx, sy,sw,sh,dx,dy,dw,dh, reward){
+	function questionmark(i, sx, sy,sw,sh,dx,dy,dw,dh,ig, reward){
 		//gameObject.call(this);
-		gameObject.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh);
+		gameObject.call(this, i,sx,sy,sw,sh,dx,dy,dw,dh,ig);
 		var z = this;
 		z.MAXBUMPHEIGHT = 8,
 		z.bump = 0,
